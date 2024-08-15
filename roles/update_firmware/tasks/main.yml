@@ -17,6 +17,7 @@
     - firmware_updates.failed
     - '"Unable to complete the operation because the catalog name entered has either unsupported firmware packages or same version installed on the server" not in firmware_updates.'
   changed_when:
+    - firmware_updates.update_status is defined
     - '"PackageList" in firmware_updates.update_status.job_details'
 
 

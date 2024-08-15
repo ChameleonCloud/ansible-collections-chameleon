@@ -39,3 +39,23 @@ git+https://github.com/ChameleonCloud/openstacksdk@chameleoncloud/blazar
 omsdk
 pysnmp < 6.0.0
 ```
+
+## Example usage
+
+An example playbook would look like the following:
+
+```
+---
+- hosts: all
+  connection: local
+  gather_facts: false
+  collections:
+    - "chameleon.ciab"
+  roles:
+    - chameleon.ciab.update_bios_settings
+    - chameleon.ciab.update_firmware
+```
+
+And you will want to execute it using the `--limit` keyword, such as:
+
+ansible-playbook -i clouds.yaml  --limit nc27  playbooks/my_node_playbook.yml
