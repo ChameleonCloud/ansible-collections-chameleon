@@ -59,9 +59,9 @@ class InventoryModule(BaseInventoryPlugin):
 
         host_vars = dict(ironic=node)
 
-        host_vars["idrac_ip"] = node.driver_info.get("ipmi_address")
-        host_vars["idrac_user"] = node.driver_info.get("ipmi_username")
-        host_vars["idrac_password"] = node.driver_info.get("ipmi_password")
+        host_vars["bmc_ip"] = node.driver_info.get("ipmi_address")
+        host_vars["bmc_user"] = node.driver_info.get("ipmi_username")
+        host_vars["bmc_password"] = node.driver_info.get("ipmi_password")
 
         return host_vars
 

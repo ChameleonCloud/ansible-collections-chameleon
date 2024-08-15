@@ -1,0 +1,143 @@
+- name: get ironic boot_mode capability
+  vars:
+    capabilities: "{{ dict(ironic.properties.capabilities | split(',') | map('split',':') )}}"
+  set_fact:
+    ironic_current_bootmode: "{{ capabilities.boot_mode }}"
+    ironic_target_bootmode: "{{ ironic_attributes.properties.capabilities.boot_mode }}"
+    provision_state: "{{ ironic.provision_state }}"
+    maintenance: "{{ ironic.is_maintenance }}"
+    ironic_uuid: "{{ ironic.id }}"
+
+- name: Get System Inventories
+  community.general.redfish_info:
+    category: Systems
+    command: GetNicInventory,GetBiosAttributes
+    baseuri: "{{ bmc_ip }}"
+    username: "{{ bmc_user }}"
+    password: "{{ bmc_password }}"
+  register: redfish_systems_result
+- name: set fact for bios entries and nic entries
+  vars:
+    bios_entries: "{{ redfish_systems_result.redfish_facts.bios_attribute.entries[0][1] }}"
+    nic_entries: "{{ redfish_systems_result.redfish_facts.nic.entries[0][1] }}"
+  set_fact:
+    bios_entries: "{{ bios_entries }}"
+    nic_entries: "{{ nic_entries }}"
+    system_current_bootmode: "{{ bios_entries.BootMode }}"
+    system_target_bootmode: "{{ bios_attributes.BootMode }}"
+
+- name: show bootmode status
+  debug:
+    msg:
+      ironic: "{{ ironic_current_bootmode }} - {{ ironic_target_bootmode }}"
+      system: "{{ system_current_bootmode }} - {{ system_target_bootmode }}"
+  when:
+    - (ironic_current_bootmode != ironic_target_bootmode) or (system_current_bootmode != system_target_bootmode)
+
+- name: Set Pending Bios Attributes
+  block:
+    - community.general.redfish_config:
+        category: Systems
+        command: SetBiosAttributes
+        baseuri: "{{ bmc_ip }}"
+        username: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+        bios_attributes: "{{ bios_attributes }}"
+      register: configure_bios
+      failed_when:
+        - configure_bios.failed
+        - '"Pending configuration values are already committed" not in configure_bios.msg'
+      changed_when:
+        - (configure_bios.changed) or ('"Pending configuration values are already committed" in configure_bios.msg')
+        - '"BIOS attributes already set" not in configure_bios.msg'
+    - name: create biosconfig job
+      community.general.idrac_redfish_command:
+        category: Systems
+        command: CreateBiosConfigJob
+        baseuri: "{{ bmc_ip }}"
+        username: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+      when: configure_bios.changed
+
+- name: Apply boot mode settings to system and ironic
+  when:
+    - (configure_bios.changed)
+  block:
+    - name: set node to maintenance mode
+      openstack.cloud.resource:
+        service: baremetal
+        type: node
+        attributes:
+          id: "{{ ironic_uuid }}"
+          is_maintenance: true
+
+    - name: Reboot system to apply pending changes
+      block:
+        - redfish_command:
+            category: Systems
+            command: PowerReboot
+            baseuri: "{{ bmc_ip }}"
+            username: "{{ bmc_user }}"
+            password: "{{ bmc_password }}"
+      rescue:
+        - redfish_command:
+            category: Systems
+            command: PowerOn
+            baseuri: "{{ bmc_ip }}"
+            username: "{{ bmc_user }}"
+            password: "{{ bmc_password }}"
+
+- name: update ironic node boot capability to match system
+  openstack.cloud.resource:
+    service: baremetal
+    type: node
+    updateable_attributes:
+      - properties
+    attributes:
+      id: "{{ ironic_uuid }}"
+      properties:
+        capabilities: "boot_mode:{{ironic_target_bootmode}}"
+  when: ironic_current_bootmode != ironic_target_bootmode
+
+- name: unset node maintenance because we're done
+  openstack.cloud.resource:
+    service: baremetal
+    type: node
+    attributes:
+      id: "{{ ironic_uuid }}"
+      is_maintenance: false
+  when:
+    - ironic_current_bootmode == ironic_target_bootmode
+    - system_current_bootmode == system_target_bootmode
+
+
+      
+
+
+
+
+# - name: Print UEFI PXE Enabled NICs
+#   when:
+#     - system_boot_mode == "uefi"
+#   vars:
+#     pxe_nic1_info: "{{ nic_entries | selectattr('Id', 'match', bios_entries.PxeDev1Interface ) }}"
+#     pxe_nic2_info: "{{ nic_entries | selectattr('Id', 'match', bios_entries.PxeDev2Interface ) }}"
+#     pxe_nic3_info: "{{ nic_entries | selectattr('Id', 'match', bios_entries.PxeDev3Interface ) }}"
+#     pxe_nic4_info: "{{ nic_entries | selectattr('Id', 'match', bios_entries.PxeDev4Interface ) }}"
+#   debug:
+#     msg:
+#       ironic_boot_mode: "{{ ironic_boot_mode }}"
+#       system_boot_mode: "{{ bios_entries.BootMode }}"
+#       boot_interfaces:
+#       - PxeDev1EnDis: "{{ bios_entries.PxeDev1EnDis }}"
+#         PxeDev1Interface: "{{ bios_entries.PxeDev1Interface }}"
+#         NicInfo: "{{ pxe_nic1_info }}"
+#       - PxeDev2EnDis: "{{ bios_entries.PxeDev2EnDis }}"
+#         PxeDev2Interface: "{{ bios_entries.PxeDev2Interface }}"
+#         NicInfo: "{{ pxe_nic2_info }}"
+#       - PxeDev3EnDis: "{{ bios_entries.PxeDev3EnDis }}"
+#         PxeDev3Interface: "{{ bios_entries.PxeDev3Interface }}"
+#         NicInfo: "{{ pxe_nic3_info }}"
+#       - PxeDev4EnDis: "{{ bios_entries.PxeDev4EnDis }}"
+#         PxeDev4Interface: "{{ bios_entries.PxeDev4Interface }}"
+#         NicInfo: "{{ pxe_nic4_info }}"

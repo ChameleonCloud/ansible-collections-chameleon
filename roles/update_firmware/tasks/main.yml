@@ -1,0 +1,57 @@
+- name: check for system updates
+  dellemc.openmanage.idrac_firmware:
+    idrac_ip: "{{ bmc_ip }}"
+    idrac_user: "{{ bmc_user }}"
+    idrac_password: "{{ bmc_password }}"
+    validate_certs: False
+    share_name: "https://downloads.dell.com"
+    reboot: false
+    job_wait: false
+    apply_update: false
+    proxy_support: ParametersProxy
+    proxy_server: "{{ default_gw }}"
+    proxy_type: HTTP
+    proxy_port: 3128
+  register: firmware_updates
+  failed_when:
+    - firmware_updates.failed
+    - '"Unable to complete the operation because the catalog name entered has either unsupported firmware packages or same version installed on the server" not in firmware_updates.'
+  changed_when:
+    - '"PackageList" in firmware_updates.update_status.job_details'
+
+
+
+- name: Apply pending system updates
+  when:
+    - (firmware_updates.changed)
+  block:
+    - name: set node to maintenance mode
+      openstack.cloud.resource:
+        service: baremetal
+        type: node
+        attributes:
+          id: "{{ ironic_uuid }}"
+          is_maintenance: true
+
+    - name: reboot and apply
+      dellemc.openmanage.idrac_firmware:
+        idrac_ip: "{{ bmc_ip }}"
+        idrac_user: "{{ bmc_user }}"
+        idrac_password: "{{ bmc_password }}"
+        validate_certs: False
+        share_name: "https://downloads.dell.com"
+        reboot: true
+        job_wait: true
+        apply_update: true
+        proxy_support: ParametersProxy
+        proxy_server: "{{ default_gw }}"
+        proxy_type: HTTP
+        proxy_port: 3128
+
+    - name: unset maintennace mode
+      openstack.cloud.resource:
+        service: baremetal
+        type: node
+        attributes:
+          id: "{{ ironic_uuid }}"
+          is_maintenance: true

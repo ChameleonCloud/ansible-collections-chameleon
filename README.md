@@ -18,6 +18,15 @@ For safety, it is excluding any nodes in an "associated" state.
 
 A future version will make this configurable.
 
+
+each node will have the following `host_vars` set from the ironic "driver_info":
+
+- "bmc_ip": "ipmi_address"
+- "bmc_user": "ipmi_username"
+- "bmc_password": "ipmi_password"
+
+The full dict returned from the ironic API is available under the host_var `ironic`, so you can, for example, fetch the ironic uuid via `ironic.id`
+
 ## Dependencies:
 
 To use this collection, you will need the following python dependencies in your virtualenv:

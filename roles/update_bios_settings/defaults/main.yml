@@ -1,0 +1,40 @@
+default_gw: "{{ '172.30.0.7' if ( '172.30.0' in bmc_ip ) else '172.31.0.7' }}"
+
+boot_mode: uefi
+boot_mode_mappings:
+  ironic:
+    uefi: uefi
+    bios: bios
+  redfish:
+    uefi: "Uefi"
+    bios: "Bios"
+ironic_attributes:
+  properties:
+    capabilities:
+      boot_mode: "{{ boot_mode_mappings.ironic[boot_mode] }}"
+
+bios_attributes:
+  BootMode: "{{ boot_mode_mappings.redfish[boot_mode] }}"
+
+idrac_attributes:
+  OS-BMC.1.AdminState: Disabled # disable OS access to BMC NIC
+
+  # enable remote logging
+  SysLog.1.Server1: "10.140.80.7"
+  SysLog.1.Port: 5140
+  SysLog.1.SysLogEnable: "Enabled"
+  IPMILan.1.AlertEnable: "Enabled"
+  IPv4.1.Gateway: "{{ default_gw }}" #different IP for p2 and p3 nodes
+  # NIC.1.TopologyLldp": "Enabled" # broadcast lldp on server NICs
+
+system_attributes:
+  ServerOS.1.HostName: "{{ inventory_hostname }}"
+  # "ServerTopology.1.RackSlot": 0,
+  # "ServerTopology.1.SizeOfManagedSystemInU": 2,
+  # "ServerTopology.1.AisleName": "",
+  # "ServerTopology.1.DataCenterName": "",
+  # "ServerTopology.1.RackName": "",
+  # "ServerTopology.1.RoomName": "",
+
+lifecycle_controller_attributes:
+  LCAttributes.1.CollectSystemInventoryOnRestart: "Enabled"

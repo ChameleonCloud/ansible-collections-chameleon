@@ -1,0 +1,3 @@
+- include_tasks: update_idrac_attributes.yml
+
+- include_tasks: update_boot_mode.yml

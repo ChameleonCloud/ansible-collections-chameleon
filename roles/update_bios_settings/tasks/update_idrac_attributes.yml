@@ -1,0 +1,9 @@
+- name: update idrac attributes
+  dellemc.openmanage.idrac_attributes:
+    idrac_ip: "{{ bmc_ip }}"
+    idrac_user: "{{ bmc_user }}"
+    idrac_password: "{{ bmc_password }}"
+    validate_certs: False
+    idrac_attributes: "{{ idrac_attributes }}"
+    system_attributes: "{{ system_attributes }}"
+    lifecycle_controller_attributes: "{{ lifecycle_controller_attributes }}"
